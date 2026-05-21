@@ -63,8 +63,13 @@ graph LR
     P3[feature_gold_table.py]:::process
 
     subgraph Gold
-        G1[(ML Feature Store <br> Train/OOT Split)]:::gold
+        G1[(ML Feature Store)]:::gold
         G2[(ML Label Store)]:::gold
+        
+        %% Splits
+        G_Train[(Train Set)]:::gold
+        G_Test[(Test/Val Set)]:::gold
+        G_OOT[(OOT Set)]:::gold
     end
 
     S1 --> P3
@@ -72,6 +77,10 @@ graph LR
     S3 --> P3
     P3 --> G1
     P3 --> G2
+    
+    G1 --> G_Train
+    G1 --> G_Test
+    G1 --> G_OOT
 
     %% Logging — sits below, small
     LOG[/logs/pipeline.log/]:::log
