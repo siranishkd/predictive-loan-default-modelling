@@ -1,0 +1,20 @@
+# Data files (too large for git)
+data/
+datamart/
+
+# Generated artifacts
+__pycache__/
+*.zip
+logs/
+pipeline.log
+
+# Submission folder (local only)
+submission/
+
+# Binary & temp files
+.DS_Store
+.ipynb_checkpoints/
+*.bkp
+*.pptx
+*.pdf
+0_original/
