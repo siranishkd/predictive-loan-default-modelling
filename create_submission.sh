@@ -21,6 +21,10 @@ else
     cp Readme.txt submission/temp_stage/
 fi
 
+# Clean pycache before zipping
+find submission/temp_stage -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null
+find submission/temp_stage -name "*.pyc" -delete 2>/dev/null
+
 # Zip the contents
 cd submission/temp_stage
 zip -r ../assignment1_submission.zip ./*
