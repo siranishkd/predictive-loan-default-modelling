@@ -15,18 +15,15 @@ def process_feature_gold(spark: SparkSession, datamart_silver_dir: str, datamart
     logger.info("--- Processing Feature Gold Tables (v3.0 ASOF with Loans Spine) ---")
     
     silver_click_path = os.path.join(datamart_silver_dir, "silver_feature_clickstream.parquet")
-    silver_attr_path = os.path.join(datamart_silver_dir, "silver_feature_attributes.parquet")
-    silver_fin_path = os.path.join(datamart_silver_dir, "silver_feature_financials.parquet")
+    silver_profile_path = os.path.join(datamart_silver_dir, "silver_customer_profile.parquet")
     silver_loan_path = os.path.join(datamart_silver_dir, "silver_feature_loans.parquet")
     
-    if not (os.path.exists(silver_click_path) and os.path.exists(silver_attr_path) and 
-            os.path.exists(silver_fin_path) and os.path.exists(silver_loan_path)):
+    if not (os.path.exists(silver_click_path) and os.path.exists(silver_profile_path) and os.path.exists(silver_loan_path)):
         logger.error("Silver tables not ready. Skipping Gold.")
         return
         
     df_click = spark.read.parquet(silver_click_path).drop("ingestion_timestamp")
-    df_attr = spark.read.parquet(silver_attr_path).drop("ingestion_timestamp")
-    df_fin = spark.read.parquet(silver_fin_path).drop("ingestion_timestamp")
+    df_profile = spark.read.parquet(silver_profile_path).drop("ingestion_timestamp")
     df_loans = spark.read.parquet(silver_loan_path).drop("ingestion_timestamp")
     
     # The Loans table is our universe of target events. We anchor everything to its snapshot_date
@@ -36,16 +33,14 @@ def process_feature_gold(spark: SparkSession, datamart_silver_dir: str, datamart
     w_asof = Window.partitionBy("Customer_ID").orderBy("snapshot_date").rowsBetween(Window.unboundedPreceding, Window.currentRow)
     
     # ---------------------------------------------------------
-    # 1. ASOF Join for Attributes & Financials
+    # 1. ASOF Join for Customer Profile (Merged Demographics & Financials)
     # ---------------------------------------------------------
     df_timeline = df_base.select("Customer_ID", "snapshot_date") \
-        .unionByName(df_attr.select("Customer_ID", "snapshot_date")) \
-        .unionByName(df_fin.select("Customer_ID", "snapshot_date")) \
+        .unionByName(df_profile.select("Customer_ID", "snapshot_date")) \
         .distinct()
         
     df_timeline_all = df_timeline \
-        .join(df_attr, ["Customer_ID", "snapshot_date"], "left") \
-        .join(df_fin, ["Customer_ID", "snapshot_date"], "left")
+        .join(df_profile, ["Customer_ID", "snapshot_date"], "left")
         
     cols_to_fill = [c for c in df_timeline_all.columns if c not in ["Customer_ID", "snapshot_date"]]
     for c in cols_to_fill:

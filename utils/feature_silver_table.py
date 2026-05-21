@@ -53,13 +53,16 @@ def process_feature_silver(spark: SparkSession, datamart_bronze_dir: str, datama
         df_click.write.mode("overwrite").parquet(out_path)
         logger.info(f"Saved silver clickstream to {out_path}")
 
-    # 2. Attributes
+    # 2. Attributes & 3. Financials (Merged into Customer Profile in Silver)
     attr_path = os.path.join(datamart_bronze_dir, "bronze_feature_attributes.parquet")
-    if os.path.exists(attr_path):
-        logger.info("Cleaning Attributes data...")
+    fin_path = os.path.join(datamart_bronze_dir, "bronze_feature_financials.parquet")
+    
+    if os.path.exists(attr_path) and os.path.exists(fin_path):
+        logger.info("Cleaning and consolidating Attributes & Financials into Customer Profile...")
         df_attr = spark.read.parquet(attr_path)
+        df_fin = spark.read.parquet(fin_path)
         
-        # Strip string garbage before casting
+        # Clean Attributes
         df_attr = df_attr.withColumn("Age", regexp_replace(col("Age"), r"[^\d.-]", "").cast("int"))
         
         # Data Quality Alerting & Median Imputation for Age
@@ -77,17 +80,7 @@ def process_feature_silver(spark: SparkSession, datamart_bronze_dir: str, datama
         df_attr = df_attr.dropna(subset=["Customer_ID", "snapshot_date"])
         df_attr = df_attr.dropDuplicates(["Customer_ID", "snapshot_date"])
         
-        out_path = os.path.join(datamart_silver_dir, "silver_feature_attributes.parquet")
-        df_attr.write.mode("overwrite").parquet(out_path)
-        logger.info(f"Saved silver attributes to {out_path}")
-
-    # 3. Financials
-    fin_path = os.path.join(datamart_bronze_dir, "bronze_feature_financials.parquet")
-    if os.path.exists(fin_path):
-        logger.info("Cleaning Financials data...")
-        df_fin = spark.read.parquet(fin_path)
-        
-        # Clean numeric columns strictly
+        # Clean Financials
         numeric_cols = [
             "Annual_Income", "Monthly_Inhand_Salary", "Num_Bank_Accounts", "Num_Credit_Card", 
             "Interest_Rate", "Num_of_Loan", "Delay_from_due_date", 
@@ -113,7 +106,7 @@ def process_feature_silver(spark: SparkSession, datamart_bronze_dir: str, datama
         # Cap high incomes at 99th percentile to remove billionaire outliers
         income_p99 = df_fin.approxQuantile("Annual_Income", [0.99], 0.01)[0]
         df_fin = df_fin.withColumn("Annual_Income", 
-            when(income_anomaly_cond, lit(0))  # Fill neg/null with 0
+            when(income_anomaly_cond, lit(0.0))  # Fill neg/null with 0
             .when(col("Annual_Income") > income_p99, lit(income_p99)) # Cap at 99th percentile
             .otherwise(col("Annual_Income")))
                 
@@ -121,9 +114,23 @@ def process_feature_silver(spark: SparkSession, datamart_bronze_dir: str, datama
         df_fin = df_fin.dropna(subset=["Customer_ID", "snapshot_date"])
         df_fin = df_fin.dropDuplicates(["Customer_ID", "snapshot_date"])
         
-        out_path = os.path.join(datamart_silver_dir, "silver_feature_financials.parquet")
-        df_fin.write.mode("overwrite").parquet(out_path)
-        logger.info(f"Saved silver financials to {out_path}")
+        # Inner join to consolidate into single Customer Profile
+        df_fin_clean = df_fin.drop("ingestion_timestamp")
+        df_profile = df_attr.join(df_fin_clean, ["Customer_ID", "snapshot_date"], "inner")
+        
+        out_profile_path = os.path.join(datamart_silver_dir, "silver_customer_profile.parquet")
+        df_profile.write.mode("overwrite").parquet(out_profile_path)
+        logger.info(f"Saved consolidated silver customer profile to {out_profile_path} with {df_profile.count()} rows.")
+        
+        # Clean up old separate files if they exist
+        import shutil
+        for old_file in ["silver_feature_attributes.parquet", "silver_feature_financials.parquet"]:
+            old_path = os.path.join(datamart_silver_dir, old_file)
+            if os.path.exists(old_path):
+                try:
+                    shutil.rmtree(old_path)
+                except Exception as e:
+                    logger.warning(f"Could not remove old file {old_path}: {e}")
         
     # 4. Loans
     loan_path = os.path.join(datamart_bronze_dir, "bronze_feature_loans.parquet")
