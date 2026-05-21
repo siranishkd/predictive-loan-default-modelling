@@ -84,6 +84,14 @@ def process_feature_gold(spark: SparkSession, datamart_silver_dir: str, datamart
     fill_dict = {c: 0.0 for c in agg_cols}
     df_gold = df_gold.fillna(fill_dict)
     
+    # ---------------------------------------------------------
+    # 3. Train/Test/OOT Temporal Split Indicator (Prevent Temporal Leakage)
+    # ---------------------------------------------------------
+    # Cutoff: Last 20% of snapshot dates (>= 2025-05-01) designated as Out-of-Time (OOT) validation
+    df_gold = df_gold.withColumn("dataset_split", 
+        F.when(col("snapshot_date") >= F.lit("2025-05-01"), F.lit("OOT"))
+        .otherwise(F.lit("Train")))
+    
     out_path = os.path.join(datamart_gold_dir, "gold_feature_store.parquet")
     df_gold.write.mode("overwrite").parquet(out_path)
     logger.info(f"Saved gold feature store to {out_path} with {df_gold.count()} rows.")
