@@ -27,6 +27,7 @@ find submission/temp_stage -name "*.pyc" -delete 2>/dev/null
 
 # Zip the contents
 cd submission/temp_stage
+rm -f ../assignment1_submission.zip
 zip -r ../assignment1_submission.zip ./*
 cd ../..
 
