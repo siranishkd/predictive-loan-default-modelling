@@ -68,7 +68,7 @@ graph LR
         
         %% Splits
         G_Train[(Train Set)]:::gold
-        G_Test[(Test/Val Set)]:::gold
+        G_Test[(Test Set)]:::gold
         G_OOT[(OOT Set)]:::gold
     end
 
