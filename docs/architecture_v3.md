@@ -63,7 +63,7 @@ graph LR
     P3[feature_gold_table.py]:::process
 
     subgraph Gold
-        G1[(ML Feature Store)]:::gold
+        G1[(ML Feature Store <br> Train/OOT Split)]:::gold
         G2[(ML Label Store)]:::gold
     end
 
