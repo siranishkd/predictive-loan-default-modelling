@@ -107,19 +107,24 @@ This document contains the slide-by-slide copy, layout designs, and speaker note
 
 ---
 
-### Slide 8: Gold Layer: Point-in-Time ASOF Joins
-*   **Slide Title:** Gold Layer: Point-in-Time ASOF Feature Engineering
-*   **Visual Layout:** Two-column layout. Left: ASOF logic; Right: Clickstream Windowing.
+### Slide 8: Gold Layer: Point-in-Time & Temporal Split
+*   **Slide Title:** Gold Layer: Point-in-Time & Temporal Splits
+*   **Visual Layout:** Two-column layout. Left: ASOF logic & Splits; Right: Clickstream Windowing.
 *   **Key Content (Left):**
-    *   **ASOF Join Logic:** We generate a timeline of dates for each customer, left-join their profile updates, and use PySpark's window function `last(column, ignorenulls=True)` to forward-fill values up to the loan snapshot.
-    *   **Derived Feature:** Engineered `Debt_to_Income` by dividing outstanding debt by annual income at that specific point in time.
+    *   **ASOF Join Logic:** Generate timeline, left-join customer profile, and forward-fill values up to loan snapshot using window functions.
+    *   **Temporal Split Column:** Added `dataset_split` directly into the Gold table schema:
+        *   `snapshot_date < '2025-05-01'` labeled as `Train` (123,394 rows).
+        *   `snapshot_date >= '2025-05-01'` labeled as `OOT` (14,106 rows).
+        *   *Benefit:* Restricts testing to future snapshots, preventing temporal leakage during model evaluation.
+    *   **Derived Feature:** Engineered `Debt_to_Income` dynamically using point-in-time metrics.
 *   **Key Content (Right):**
     *   **Time-Windowed Clickstream:**
         *   Clickstream features change rapidly.
         *   We compute a rolling **90-day window** for clickstream columns `fe_1` to `fe_20`.
         *   Calculates rolling `sum` and `avg` for each customer prior to the loan date.
 *   **Speaker Notes:**
-    *   *"To connect the customer's profile and clickstream history to the loan, we use ASOF joins. We forward-fill the last known profile state, and compute a rolling 90-day sum and average for clickstream features. This gives us high-quality, time-calibrated input features."*
+    *   *"To connect customer profile and clickstream history, we use ASOF joins. To guarantee proper validation, we also engineered a temporal split column in our Gold schema: labeling events before May 2025 as Train and events after as Out-of-Time (OOT). This ensures the ML model is tested on clean future data."*
+
 
 ---
 
