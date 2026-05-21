@@ -76,6 +76,7 @@ graph LR
 
     %% Logging — sits below, small
     LOG[/logs/pipeline.log/]:::log
+    P1 -.-> LOG
     P2 -.-> LOG
     P3 -.-> LOG
 ```
