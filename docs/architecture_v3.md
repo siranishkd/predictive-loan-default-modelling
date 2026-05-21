@@ -82,24 +82,25 @@ graph LR
 
 ## Layer Definitions (per Databricks)
 
-| Layer | Purpose (Databricks) | Our Processing Steps | Anomalies & Logging |
-|-------|---------------------|----------------------|---------------------|
-| **Bronze** | Land raw data "as-is" with metadata | ✅ Read 4 CSVs (Clickstream, Attributes, Financials, Loans) | ✅ `ingestion_timestamp` added to every row |
-| | | ✅ Add `ingestion_timestamp` column | ✅ Row counts logged per table |
-| | | ✅ Write to Parquet (no schema changes) | 🔲 *Backlog: Schema drift detection (alert if CSV columns change)* |
-| **Silver** | Cleanse, conform, deduplicate — "Enterprise view" | ✅ Cast `Age` to int, regex-strip garbage chars | ✅ **Age**: 988/12500 (7.9%) anomalies — `WARNING` logged |
-| | | ✅ Median-fill Age outliers (outside 18–100) | ✅ **Num_of_Loan**: 563/12500 (4.5%) anomalies — `INFO` logged |
-| | | ✅ Median-fill Num_of_Loan outliers (outside 0–50) | ✅ **Annual_Income**: Winsorized at 99th percentile |
-| | | ✅ Winsorize Annual_Income at 99th percentile | ✅ Threshold alerting: <1% INFO, >5% WARNING, >20% CRITICAL |
-| | | ✅ Regex-clean all financial numeric columns | 🔲 *Backlog: Monitor `Outstanding_Debt` for negative values* |
-| | | ✅ Cast `loan_start_date`, `snapshot_date` to Date | 🔲 *Backlog: Monitor `Monthly_Balance` for extreme negatives* |
-| | | ✅ Deduplicate by `Customer_ID` + `snapshot_date` | 🔲 *Backlog: Alert on duplicate rate exceeding 1%* |
-| **Gold** | Curated, consumption-ready, business-level tables | ✅ Loans table as anchor spine (137,500 events) | ✅ Gold row count logged |
-| | | ✅ ASOF join: forward-fill Attributes to loan dates | ✅ Zero data leakage guaranteed (point-in-time) |
-| | | ✅ ASOF join: forward-fill Financials to loan dates | 🔲 *Backlog: Alert if Gold row count deviates >10% from Silver Loans* |
-| | | ✅ 90-day rolling window aggregation for Clickstream (sum + avg of fe_1 to fe_20) | 🔲 *Backlog: Feature drift monitoring (compare Gold stats across runs)* |
-| | | ✅ Derived feature: `Debt_to_Income` ratio | |
-| | | ✅ Fill missing clickstream aggregates with 0.0 | |
+| Layer | Purpose (Databricks) | What Our Code Does (`*.py`) | Our Processing Steps | Anomalies & Logging |
+|-------|---------------------|---------------------------|----------------------|---------------------|
+| **Bronze** | Land raw data "as-is" with metadata (load date, process ID) | `feature_bronze_table.py` loops through a dictionary of 4 CSV paths. For each file, it reads with `inferSchema=False` (preserves raw strings), adds an `ingestion_timestamp` metadata column, and writes to Parquet. No cleaning, no type casting — raw data preserved exactly as received. | ✅ Read 4 CSVs (Clickstream, Attributes, Financials, Loans) | ✅ `ingestion_timestamp` added to every row |
+| | | | ✅ Add `ingestion_timestamp` column | ✅ Row counts logged per table |
+| | | | ✅ Write to Parquet (no schema changes) | 🔲 *Backlog: Schema drift detection* |
+| **Silver** | Cleanse, conform, deduplicate — "Enterprise view" of key business entities | `feature_silver_table.py` applies "just-enough" transformations per Databricks guidance. It: (1) regex-strips garbage chars from numeric strings, (2) casts columns to correct types (int/double/date), (3) runs `check_anomaly_threshold()` to count and log anomalies before fixing, (4) applies median imputation for bounded vars and winsorization for skewed vars, (5) deduplicates by composite key. | ✅ Cast `Age` to int, regex-strip garbage chars | ✅ **Age**: 988/12500 (7.9%) — `WARNING` |
+| | | | ✅ Median-fill Age outliers (outside 18–100) | ✅ **Num_of_Loan**: 563/12500 (4.5%) — `INFO` |
+| | | | ✅ Median-fill Num_of_Loan outliers (outside 0–50) | ✅ **Annual_Income**: Winsorized at P99 |
+| | | | ✅ Winsorize Annual_Income at 99th percentile | ✅ Threshold alerting: <1% INFO, >5% WARNING, >20% CRITICAL |
+| | | | ✅ Regex-clean all financial numeric columns | 🔲 *Backlog: Monthly_Balance has -3.3×10²⁵ outlier* |
+| | | | ✅ Cast `loan_start_date`, `snapshot_date` to Date | 🔲 *Backlog: Credit_Mix has 2,611 garbage `_` values (20.9%)* |
+| | | | ✅ Deduplicate by `Customer_ID` + `snapshot_date` | 🔲 *Backlog: Payment_Behaviour has 998 `!@9#%8` values (8.0%)* |
+| | | | | 🔲 *Backlog: Interest_Rate max=5,789% — cap at 100* |
+| **Gold** | Curated, consumption-ready, business-level aggregates and features | `feature_gold_table.py` uses the **Loans** table as the anchor spine (137,500 loan events). For each loan snapshot, it performs ASOF (point-in-time) forward-fill joins to pull the latest available Attributes and Financials without looking into the future. For Clickstream, it computes 90-day rolling `sum` and `avg` windows for all 20 `fe_` features. Finally, it derives `Debt_to_Income` and fills missing clickstream with 0. | ✅ Loans table as anchor spine (137,500 events) | ✅ Gold row count logged |
+| | | | ✅ ASOF join: forward-fill Attributes to loan dates | ✅ Zero data leakage guaranteed (point-in-time) |
+| | | | ✅ ASOF join: forward-fill Financials to loan dates | 🔲 *Backlog: Alert if Gold rows deviate >10% from Silver Loans* |
+| | | | ✅ 90-day rolling window for Clickstream (sum + avg, fe_1–fe_20) | 🔲 *Backlog: Feature drift monitoring across runs* |
+| | | | ✅ Derived feature: `Debt_to_Income` ratio | |
+| | | | ✅ Fill missing clickstream aggregates with 0.0 | |
 
 ## Logging Strategy
 
