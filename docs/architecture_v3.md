@@ -95,11 +95,12 @@ graph LR
 | | | | ✅ Cast `loan_start_date`, `snapshot_date` to Date | 🔲 *Backlog: Credit_Mix has 2,611 garbage `_` values (20.9%)* |
 | | | | ✅ Deduplicate by `Customer_ID` + `snapshot_date` | 🔲 *Backlog: Payment_Behaviour has 998 `!@9#%8` values (8.0%)* |
 | | | | | 🔲 *Backlog: Interest_Rate max=5,789% — cap at 100* |
-| **Gold** | Curated, consumption-ready, business-level aggregates and features | `feature_gold_table.py` uses the **Loans** table as the anchor spine (137,500 loan events). For each loan snapshot, it performs ASOF (point-in-time) forward-fill joins to pull the latest available Customer Profile (merged Demographics + Financials) without looking into the future. For Clickstream, it computes 90-day rolling `sum` and `avg` windows for all 20 `fe_` features. Finally, it derives `Debt_to_Income` and fills missing clickstream with 0. | ✅ Loans table as anchor spine (137,500 events) | ✅ Gold row count logged |
+| **Gold** | Curated, consumption-ready, business-level aggregates and features | `feature_gold_table.py` uses the **Loans** table as the anchor spine (137,500 loan events). For each loan snapshot, it performs ASOF (point-in-time) forward-fill joins to pull the latest available Customer Profile (merged Demographics + Financials) without looking into the future. For Clickstream, it computes 90-day rolling `sum` and `avg` windows for all 20 `fe_` features. Finally, it derives `Debt_to_Income`, fills missing clickstream with 0, and adds a `dataset_split` temporal indicator (Train/OOT split). | ✅ Loans table as anchor spine (137,500 events) | ✅ Gold row count logged |
 | | | | ✅ ASOF join: forward-fill Customer Profile to loan dates | ✅ Zero data leakage guaranteed (point-in-time) |
-| | | | ✅ 90-day rolling window for Clickstream (sum + avg, fe_1–fe_20) | 🔲 *Backlog: Alert if Gold rows deviate >10% from Silver Loans* |
-| | | | ✅ Derived feature: `Debt_to_Income` ratio | 🔲 *Backlog: Feature drift monitoring across runs* |
-| | | | ✅ Fill missing clickstream aggregates with 0.0 | |
+| | | | ✅ 90-day rolling window for Clickstream (sum + avg, fe_1–fe_20) | ✅ dataset_split Train/OOT split (cutoff: 2025-05-01) |
+| | | | ✅ Derived feature: `Debt_to_Income` ratio | 🔲 *Backlog: Alert if Gold rows deviate >10% from Silver Loans* |
+| | | | ✅ Fill missing clickstream aggregates with 0.0 | 🔲 *Backlog: Feature drift monitoring across runs* |
+| | | | ✅ dataset_split column (123,394 Train / 14,106 OOT) | |
 | | | | | |
 | | | `process_labels_gold_table` extracts customer loan events from `silver_loans` at a specific Months-on-Book (`mob`) and checks if their Days Past Due (`dpd`) exceeds a threshold to create ML target labels. | ✅ Extract loans at specific `mob` (Months-on-Book) | ✅ Label target generated (0 or 1 based on `dpd`) |
 | | | | ✅ Apply DPD default threshold | ✅ Label distribution metrics logged |
