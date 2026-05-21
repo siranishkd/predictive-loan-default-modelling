@@ -70,8 +70,6 @@ graph LR
         G_Train[(Train Set)]:::gold
         G_Test[(Test Set)]:::gold
         G_OOT[(OOT Set)]:::gold
-        
-        LOG[/logs/pipeline.log/]:::log
     end
 
     S1 --> P3
@@ -83,6 +81,10 @@ graph LR
     G1 --> G_Train
     G1 --> G_Test
     G1 --> G_OOT
+
+    %% Align Log to the right of Gold (outside the box) using invisible layout link
+    LOG[/logs/pipeline.log/]:::log
+    G_OOT ~~~ LOG
 
     P1 -.-> LOG
     P2 -.-> LOG
