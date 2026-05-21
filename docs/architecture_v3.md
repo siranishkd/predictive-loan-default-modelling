@@ -82,8 +82,10 @@ graph LR
     G1 --> G_Test
     G1 --> G_OOT
 
-    %% Logging — sits below, small
-    LOG[/logs/pipeline.log/]:::log
+    subgraph Observability
+        LOG[/logs/pipeline.log/]:::log
+    end
+
     P1 -.-> LOG
     P2 -.-> LOG
     P3 -.-> LOG
