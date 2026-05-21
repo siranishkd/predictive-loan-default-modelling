@@ -66,6 +66,7 @@ graph LR
 
     subgraph Gold
         G1[(ML Feature Store)]:::gold
+        G2[(ML Label Store)]:::gold
     end
 
     S1 --> P3
@@ -73,6 +74,7 @@ graph LR
     S3 --> P3
     S4 --> P3
     P3 --> G1
+    P3 --> G2
 
     %% Logging — sits below, small
     LOG[/logs/pipeline.log/]:::log
@@ -102,6 +104,9 @@ graph LR
 | | | | ✅ 90-day rolling window for Clickstream (sum + avg, fe_1–fe_20) | 🔲 *Backlog: Feature drift monitoring across runs* |
 | | | | ✅ Derived feature: `Debt_to_Income` ratio | |
 | | | | ✅ Fill missing clickstream aggregates with 0.0 | |
+| | | | | |
+| | | `process_labels_gold_table` extracts customer loan events from `silver_loans` at a specific Months-on-Book (`mob`) and checks if their Days Past Due (`dpd`) exceeds a threshold to create ML target labels. | ✅ Extract loans at specific `mob` (Months-on-Book) | ✅ Label target generated (0 or 1 based on `dpd`) |
+| | | | ✅ Apply DPD default threshold | ✅ Label distribution metrics logged |
 
 ## Logging Strategy
 
